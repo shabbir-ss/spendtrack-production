@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { Link } from "wouter";
 import { formatIndianCurrency } from "@/lib/indian-financial-year";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 interface Transaction {
   id: string;
@@ -142,34 +143,35 @@ export default function RecentTransactions() {
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="h-full flex flex-col">
+      <CardHeader className="flex-shrink-0">
         <div className="flex items-center justify-between">
-          <CardTitle>Recent Transactions</CardTitle>
+          <CardTitle className="text-lg">Recent Transactions</CardTitle>
           <Link href="/expenses">
             <Button 
               variant="ghost" 
               size="sm" 
-              className="text-blue-500 hover:text-blue-600"
+              className="text-blue-500 hover:text-blue-600 text-xs sm:text-sm"
             >
-              View All
+              <span className="hidden sm:inline">View All</span>
+              <span className="sm:hidden">All</span>
             </Button>
           </Link>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
+      <CardContent className="flex-1 min-h-0 overflow-hidden">
+        <div className="space-y-2 sm:space-y-3 h-full overflow-y-auto dashboard-scroll">
           {recentTransactions.map((transaction) => (
             <div
               key={transaction.id}
-              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+              className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
             >
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gray-100 dark:bg-gray-600 rounded-full flex items-center justify-center">
+              <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gray-100 dark:bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
                   {getIcon(transaction.type)}
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                     {transaction.description}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -177,7 +179,10 @@ export default function RecentTransactions() {
                   </p>
                 </div>
               </div>
-              <span className={`font-semibold ${getAmountColor(transaction.type)}`}>
+              <span className={cn(
+                "font-semibold text-xs sm:text-sm flex-shrink-0 ml-2",
+                getAmountColor(transaction.type)
+              )}>
                 {formatAmount(transaction.amount, transaction.type)}
               </span>
             </div>

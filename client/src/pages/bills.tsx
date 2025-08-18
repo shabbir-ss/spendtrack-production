@@ -1,17 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bill } from "@shared/schema";
+import { Bill as BillType } from "@shared/schema";
 import BillsTable from "@/components/tables/bills-table";
-import { Bell, Calendar, AlertTriangle } from "lucide-react";
+import AddBillModal from "@/components/modals/add-bill-modal";
+import { Bell, Calendar, AlertTriangle, Plus } from "lucide-react";
 import { format, isAfter, isBefore, addDays } from "date-fns";
 import { formatIndianCurrency } from "@/lib/indian-financial-year";
-import { api } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
 
 export default function Bills() {
-  const { data: bills = [], isLoading } = useQuery<Bill[]>({
-    queryKey: ["/api/bills"],
-    queryFn: () => api.get<Bill[]>("/bills"),
+  const { data: bills = [], isLoading } = useQuery<BillType[]>({
+    queryKey: ["bills"],
+    queryFn: () => apiRequest("GET", "/bills"),
   });
 
   const upcomingBills = bills.filter(bill => {
@@ -33,7 +35,16 @@ export default function Bills() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Bills & Reminders</h1>
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">Bills & Reminders</h1>
+          <p className="text-sm lg:text-base text-gray-600 dark:text-gray-400">Track and manage your recurring bills</p>
+        </div>
+        <AddBillModal>
+          <Button className="bg-orange-600 hover:bg-orange-700 text-white">
+            <Plus size={16} className="mr-2" />
+            Add Bill
+          </Button>
+        </AddBillModal>
       </div>
 
       {/* Summary Cards */}

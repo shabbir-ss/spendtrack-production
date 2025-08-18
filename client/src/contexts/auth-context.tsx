@@ -30,15 +30,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     // Check for existing user session on app load
     const storedUser = localStorage.getItem("user");
-    const token = localStorage.getItem("token");
+    const accessToken = localStorage.getItem("accessToken");
+    const refreshToken = localStorage.getItem("refreshToken");
+    const legacyToken = localStorage.getItem("token");
 
-    if (storedUser && token) {
+    if (storedUser && (accessToken || legacyToken)) {
       try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
+        
+        // Migrate legacy token if needed
+        if (legacyToken && !accessToken) {
+          localStorage.setItem("accessToken", legacyToken);
+        }
       } catch (error) {
         console.error("Error parsing stored user:", error);
         localStorage.removeItem("user");
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
         localStorage.removeItem("token");
       }
     }
@@ -54,6 +63,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem("user");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
     localStorage.removeItem("token");
   };
 

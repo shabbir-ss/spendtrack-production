@@ -40,9 +40,12 @@ export default function LoginForm({ onSuccess, onToggleMode }: LoginFormProps) {
     setError("");
 
     try {
-      const response = await apiRequest("POST", "/auth/login", data);
+      const response = await apiRequest("POST", "/auth/login", data, false); // Don't use refresh for login
       localStorage.setItem("user", JSON.stringify(response.user));
-      localStorage.setItem("token", response.token);
+      localStorage.setItem("accessToken", response.accessToken);
+      localStorage.setItem("refreshToken", response.refreshToken);
+      // Keep legacy token for backward compatibility
+      localStorage.setItem("token", response.accessToken);
       onSuccess(response.user);
     } catch (err: any) {
       setError(err.message || "Login failed. Please try again.");

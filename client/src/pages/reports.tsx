@@ -25,11 +25,11 @@ import {
   FileText,
   Share2,
 } from "lucide-react";
-import { Income, Expense, Asset } from "@shared/schema";
+import { Income as IncomeType, Expense as ExpenseType, Asset as AssetType } from "@shared/schema";
 import { INCOME_CATEGORIES, EXPENSE_CATEGORIES, ASSET_CATEGORIES } from "@/lib/constants";
 import { format, startOfWeek, startOfMonth, startOfYear, endOfWeek, endOfMonth, endOfYear, subWeeks, subMonths, subYears, isWithinInterval } from "date-fns";
 import { getCurrentFinancialYear, getPreviousFinancialYears, formatIndianCurrency } from "@/lib/indian-financial-year";
-import { api } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 
 type TimePeriod = "week" | "month" | "year" | "financial-year";
@@ -56,24 +56,24 @@ export default function Reports() {
   const [reportRange, setReportRange] = useState<ReportRange>("last3");
   const { user } = useAuth();
 
-  const { data: income = [], isLoading: incomeLoading } = useQuery<Income[]>({
-    queryKey: ["/api/income"],
-    queryFn: () => api.get<Income[]>("/income"),
+  const { data: income = [], isLoading: incomeLoading } = useQuery<IncomeType[]>({
+    queryKey: ["income"],
+    queryFn: () => apiRequest("GET", "/income"),
   });
 
-  const { data: expenses = [], isLoading: expensesLoading } = useQuery<Expense[]>({
-    queryKey: ["/api/expenses"],
-    queryFn: () => api.get<Expense[]>("/expenses"),
+  const { data: expenses = [], isLoading: expensesLoading } = useQuery<ExpenseType[]>({
+    queryKey: ["expenses"],
+    queryFn: () => apiRequest("GET", "/expenses"),
   });
 
-  const { data: assets = [], isLoading: assetsLoading } = useQuery<Asset[]>({
-    queryKey: ["/api/assets"],
-    queryFn: () => api.get<Asset[]>("/assets"),
+  const { data: assets = [], isLoading: assetsLoading } = useQuery<AssetType[]>({
+    queryKey: ["assets"],
+    queryFn: () => apiRequest("GET", "/assets"),
   });
 
   const { data: summary, isLoading: summaryLoading } = useQuery<SummaryData>({
-    queryKey: ["/api/summary"],
-    queryFn: () => api.get<SummaryData>("/summary"),
+    queryKey: ["summary"],
+    queryFn: () => apiRequest("GET", "/summary"),
   });
 
   const isLoading = incomeLoading || expensesLoading || assetsLoading || summaryLoading;

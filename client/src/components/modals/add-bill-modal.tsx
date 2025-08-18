@@ -1,11 +1,10 @@
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { insertBillSchema, type InsertBill } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { BILL_CATEGORIES, RECURRING_TYPES } from "@/lib/constants";
 import {
   Dialog,
   DialogContent,
@@ -28,12 +27,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
-export default function AddBillModal() {
+const BILL_CATEGORIES = [
+  { value: "utilities", label: "Utilities" },
+  { value: "rent", label: "Rent/Mortgage" },
+  { value: "insurance", label: "Insurance" },
+  { value: "subscription", label: "Subscription" },
+  { value: "loan", label: "Loan Payment" },
+  { value: "other", label: "Other" },
+];
+
+const RECURRENCE_OPTIONS = [
+  { value: "monthly", label: "Monthly" },
+  { value: "quarterly", label: "Quarterly" },
+  { value: "yearly", label: "Yearly" },
+  { value: "one-time", label: "One-time" },
+];
+
+interface AddBillModalProps {
+  children?: React.ReactNode;
+}
+
+export default function AddBillModal({ children }: AddBillModalProps) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -45,32 +64,28 @@ export default function AddBillModal() {
       description: "",
       category: "",
       amount: "",
-      dueDate: "",
-      recurringType: "monthly",
+      dueDate: new Date().toISOString().split("T")[0],
+      recurrence: "monthly",
+      status: "pending",
     },
   });
 
   const createBillMutation = useMutation({
-    mutationFn: (bill: InsertBill) => apiRequest("POST", "/api/bills", bill),
+    mutationFn: (data: InsertBill) => apiRequest("POST", "/bills", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bills"] });
+      queryClient.invalidateQueries({ queryKey: ["bills"] });
       toast({
         title: "Success",
-        description: "Bill reminder created successfully!",
+        description: "Bill added successfully!",
       });
-      form.reset();
       setOpen(false);
+      form.reset();
     },
-    onError: (error: any) => {
-      console.error("Bill creation error:", error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to create bill reminder.";
-      const errorDetails = error?.response?.data?.errors ? 
-        error.response.data.errors.map((e: any) => `${e.path?.join('.')}: ${e.message}`).join(', ') : '';
-      
+    onError: () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: errorDetails ? `${errorMessage} Details: ${errorDetails}` : errorMessage,
+        description: "Failed to add bill. Please try again.",
       });
     },
   });
@@ -82,12 +97,14 @@ export default function AddBillModal() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus size={16} className="mr-2" />
-          Add Bill Reminder
-        </Button>
+        {children || (
+          <Button className="bg-orange-600 hover:bg-orange-700 text-white">
+            <Plus size={16} className="mr-2" />
+            Add Bill
+          </Button>
+        )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Bill Reminder</DialogTitle>
         </DialogHeader>
@@ -100,9 +117,25 @@ export default function AddBillModal() {
                 <FormItem>
                   <FormLabel>Bill Name</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="e.g., Electricity Bill" 
-                      {...field} 
+                    <Input placeholder="Enter bill name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Enter description"
+                      className="resize-none"
+                      {...field}
+                      value={field.value || ""}
                     />
                   </FormControl>
                   <FormMessage />
@@ -119,7 +152,7 @@ export default function AddBillModal() {
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
+                        <SelectValue placeholder="Select bill category" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -140,14 +173,20 @@ export default function AddBillModal() {
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount (₹)</FormLabel>
+                  <FormLabel>Amount</FormLabel>
                   <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00" 
-                      {...field} 
-                    />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                        ₹
+                      </span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="pl-8"
+                        {...field}
+                      />
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -170,20 +209,20 @@ export default function AddBillModal() {
 
             <FormField
               control={form.control}
-              name="recurringType"
+              name="recurrence"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Recurring Type</FormLabel>
+                  <FormLabel>Recurrence</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
+                        <SelectValue placeholder="Select recurrence" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {RECURRING_TYPES.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
+                      {RECURRENCE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -193,38 +232,21 @@ export default function AddBillModal() {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Additional notes about this bill..."
-                      className="min-h-[80px]"
-                      {...field}
-                      value={field.value || ""}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end space-x-2">
-              <Button 
-                type="button" 
-                variant="outline" 
+            <div className="flex space-x-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
                 onClick={() => setOpen(false)}
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
+                className="flex-1 bg-orange-600 hover:bg-orange-700"
                 disabled={createBillMutation.isPending}
               >
-                {createBillMutation.isPending ? "Creating..." : "Create Bill"}
+                {createBillMutation.isPending ? "Adding..." : "Add Bill"}
               </Button>
             </div>
           </form>

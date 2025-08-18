@@ -2,12 +2,14 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { IStorage } from './storage';
 import { 
-  income, expenses, assets, bills, users, accounts,
+  income, expenses, assets, bills, users, accounts, plans, planItems,
   type Income, type InsertIncome, 
   type Expense, type InsertExpense, 
   type Asset, type InsertAsset, 
   type Bill, type InsertBill,
-  type User, type Account, type InsertAccount
+  type User, type Account, type InsertAccount,
+  type Plan, type InsertPlan,
+  type PlanItem, type InsertPlanItem
 } from '@shared/schema';
 import { eq, and, desc, sum, sql, isNotNull } from 'drizzle-orm';
 import { log } from './vite';
@@ -510,6 +512,196 @@ export class PostgresStorage implements IStorage {
     } catch (error) {
       log('Error fetching all users:', error);
       return [];
+    }
+  }
+
+  // Planner methods
+  async getAllPlans(userId: string, filters?: { category?: string; status?: string; isTemplate?: boolean }): Promise<Plan[]> {
+    try {
+      let query = this.db.select().from(plans).where(eq(plans.userId, userId));
+      
+      // Apply filters if provided
+      if (filters?.category) {
+        query = query.where(and(eq(plans.userId, userId), eq(plans.category, filters.category)));
+      }
+      if (filters?.status) {
+        query = query.where(and(eq(plans.userId, userId), eq(plans.status, filters.status)));
+      }
+      if (filters?.isTemplate !== undefined) {
+        query = query.where(and(eq(plans.userId, userId), eq(plans.isTemplate, filters.isTemplate)));
+      }
+      
+      const results = await query.orderBy(desc(plans.createdAt));
+      return results;
+    } catch (error) {
+      log('Error fetching plans:', error);
+      return [];
+    }
+  }
+
+  async getPlanWithItems(id: string, userId: string): Promise<(Plan & { items: PlanItem[] }) | undefined> {
+    try {
+      const [plan] = await this.db.select().from(plans).where(and(eq(plans.id, id), eq(plans.userId, userId)));
+      if (!plan) return undefined;
+
+      const items = await this.db.select().from(planItems).where(eq(planItems.planId, id));
+      
+      return { ...plan, items };
+    } catch (error) {
+      log('Error fetching plan with items:', error);
+      return undefined;
+    }
+  }
+
+  async createPlan(insertPlan: InsertPlan & { userId: string }): Promise<Plan> {
+    const id = randomUUID();
+    const [row] = await this.db.insert(plans).values({ ...insertPlan, id }).returning();
+    return row;
+  }
+
+  async updatePlan(id: string, userId: string, updateData: Partial<InsertPlan>): Promise<Plan | undefined> {
+    const [row] = await this.db
+      .update(plans)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(and(eq(plans.id, id), eq(plans.userId, userId)))
+      .returning();
+    return row;
+  }
+
+  async deletePlan(id: string, userId: string): Promise<boolean> {
+    const rows = await this.db.delete(plans).where(and(eq(plans.id, id), eq(plans.userId, userId))).returning();
+    return rows.length > 0;
+  }
+
+  async createPlanFromTemplate(templateId: string, userId: string, data: { name: string; plannedDate?: string }): Promise<Plan | undefined> {
+    try {
+      const template = await this.getPlanWithItems(templateId, userId);
+      if (!template || !template.isTemplate) return undefined;
+
+      // Create new plan from template
+      const newPlan = await this.createPlan({
+        name: data.name,
+        description: template.description,
+        category: template.category,
+        plannedDate: data.plannedDate,
+        status: 'draft',
+        isTemplate: false,
+        templateName: null,
+        userId
+      });
+
+      // Copy items from template
+      for (const item of template.items) {
+        await this.addPlanItem({
+          planId: newPlan.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          rate: item.rate,
+          notes: item.notes
+        }, userId);
+      }
+
+      return newPlan;
+    } catch (error) {
+      log('Error creating plan from template:', error);
+      return undefined;
+    }
+  }
+
+  // Plan item methods
+  async addPlanItem(item: InsertPlanItem, userId: string): Promise<PlanItem | undefined> {
+    try {
+      // Verify the plan belongs to the user
+      const [plan] = await this.db.select().from(plans).where(and(eq(plans.id, item.planId), eq(plans.userId, userId)));
+      if (!plan) return undefined;
+
+      const id = randomUUID();
+      const totalAmount = parseFloat(item.quantity.toString()) * parseFloat(item.rate.toString());
+      
+      const [newItem] = await this.db.insert(planItems).values({ 
+        ...item, 
+        id, 
+        totalAmount: totalAmount.toString() 
+      }).returning();
+
+      // Update plan total amount
+      await this.updatePlanTotalAmount(item.planId);
+
+      return newItem;
+    } catch (error) {
+      log('Error adding plan item:', error);
+      return undefined;
+    }
+  }
+
+  async updatePlanItem(itemId: string, planId: string, userId: string, updateData: Partial<InsertPlanItem>): Promise<PlanItem | undefined> {
+    try {
+      // Verify the plan belongs to the user
+      const [plan] = await this.db.select().from(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId)));
+      if (!plan) return undefined;
+
+      // Calculate new total amount if quantity or rate changed
+      let totalAmount: string | undefined;
+      if (updateData.quantity !== undefined || updateData.rate !== undefined) {
+        const [currentItem] = await this.db.select().from(planItems).where(eq(planItems.id, itemId));
+        if (currentItem) {
+          const quantity = updateData.quantity !== undefined ? parseFloat(updateData.quantity.toString()) : parseFloat(currentItem.quantity.toString());
+          const rate = updateData.rate !== undefined ? parseFloat(updateData.rate.toString()) : parseFloat(currentItem.rate.toString());
+          totalAmount = (quantity * rate).toString();
+        }
+      }
+
+      const [updatedItem] = await this.db
+        .update(planItems)
+        .set({ ...updateData, ...(totalAmount && { totalAmount }) })
+        .where(and(eq(planItems.id, itemId), eq(planItems.planId, planId)))
+        .returning();
+
+      // Update plan total amount
+      await this.updatePlanTotalAmount(planId);
+
+      return updatedItem;
+    } catch (error) {
+      log('Error updating plan item:', error);
+      return undefined;
+    }
+  }
+
+  async deletePlanItem(itemId: string, planId: string, userId: string): Promise<boolean> {
+    try {
+      // Verify the plan belongs to the user
+      const [plan] = await this.db.select().from(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId)));
+      if (!plan) return false;
+
+      const rows = await this.db.delete(planItems).where(and(eq(planItems.id, itemId), eq(planItems.planId, planId))).returning();
+      
+      // Update plan total amount
+      await this.updatePlanTotalAmount(planId);
+
+      return rows.length > 0;
+    } catch (error) {
+      log('Error deleting plan item:', error);
+      return false;
+    }
+  }
+
+  // Helper method to update plan total amount
+  private async updatePlanTotalAmount(planId: string): Promise<void> {
+    try {
+      const [result] = await this.db
+        .select({ total: sum(planItems.totalAmount) })
+        .from(planItems)
+        .where(eq(planItems.planId, planId));
+
+      const totalAmount = result?.total || '0';
+      
+      await this.db
+        .update(plans)
+        .set({ totalAmount, updatedAt: new Date() })
+        .where(eq(plans.id, planId));
+    } catch (error) {
+      log('Error updating plan total amount:', error);
     }
   }
 }

@@ -7,6 +7,10 @@ import { useTheme } from "@/hooks/use-theme";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { createLoginUrl } from "@/lib/auth-utils";
 import Header from "@/components/layout/header";
+import ResponsiveHeader from "@/components/layout/responsive-header";
+import ResponsiveStatusBar from "@/components/layout/responsive-status-bar";
+import ResponsiveSidebar from "@/components/layout/responsive-sidebar";
+import ResponsiveBottomNav from "@/components/layout/responsive-bottom-nav";
 import Sidebar from "@/components/layout/sidebar";
 import MobileNav from "@/components/layout/mobile-nav";
 import MobileHeader from "@/components/layout/mobile-header";
@@ -15,9 +19,12 @@ import FloatingActionButton from "@/components/ui/floating-action-button";
 import Dashboard from "./pages/dashboard";
 import Income from "./pages/income";
 import Expenses from "./pages/expenses";
+import Transactions from "./pages/transactions";
 import Assets from "./pages/assets";
 import Accounts from "./pages/accounts";
 import Bills from "./pages/bills";
+import Planner from "./pages/planner";
+import Invoices from "./pages/invoices";
 import Reports from "./pages/reports";
 import AuthPage from "./pages/auth";
 import NotFound from "./pages/not-found";
@@ -30,9 +37,12 @@ function Router() {
       {/* <Route path="/dashboard" component={Dashboard} /> */}
       <Route path="/income" component={Income} />
       <Route path="/expenses" component={Expenses} />
+      <Route path="/transactions" component={Transactions} />
       <Route path="/assets" component={Assets} />
       <Route path="/accounts" component={Accounts} />
       <Route path="/bills" component={Bills} />
+      <Route path="/planner" component={Planner} />
+      <Route path="/invoices" component={Invoices} />
       <Route path="/reports" component={Reports} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
@@ -45,29 +55,23 @@ function AuthenticatedApp() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
-      {/* Desktop Header */}
-      <div className="hidden lg:block">
-        <Header theme={theme} toggleTheme={toggleTheme} />
-      </div>
+      {/* Responsive Header */}
+      <ResponsiveHeader theme={theme} toggleTheme={toggleTheme} />
       
-      {/* Mobile Header */}
-      <div className="lg:hidden">
-        <MobileHeader theme={theme} toggleTheme={toggleTheme} />
-      </div>
-      
-      <div className="flex flex-1">
-        <Sidebar />
-        <main className="flex-1 p-4 lg:p-6 overflow-auto pb-20 lg:pb-6">
-          {/* Legacy mobile nav - can be removed after testing */}
-          <div className="hidden">
-            <MobileNav />
+      <div className="flex flex-1 min-h-0">
+        <ResponsiveSidebar />
+        <main className="flex-1 flex flex-col min-h-0 p-4 lg:p-6 pb-20 lg:pb-6">
+          <div className="flex-1 min-h-0">
+            <Router />
           </div>
-          <Router />
         </main>
       </div>
       
-      {/* Bottom Navigation for Mobile */}
-      <BottomNav />
+      {/* Responsive Bottom Navigation for Mobile */}
+      <ResponsiveBottomNav />
+      
+      {/* Responsive Status Bar */}
+      <ResponsiveStatusBar showDebugInfo={process.env.NODE_ENV === 'development'} />
       
       {/* Floating Action Button */}
       {/* <FloatingActionButton /> */}

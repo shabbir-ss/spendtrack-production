@@ -1,4 +1,4 @@
-import { type Income, type InsertIncome, type Expense, type InsertExpense, type Asset, type InsertAsset, type Bill, type InsertBill } from "@shared/schema";
+import { type Income, type InsertIncome, type Expense, type InsertExpense, type Asset, type InsertAsset, type Bill, type InsertBill, type Plan, type InsertPlan, type PlanItem, type InsertPlanItem } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { log } from "./vite";
 import { PostgresStorage } from "./pg-storage";
@@ -48,6 +48,19 @@ export interface IStorage {
     netWorth: number;
     accounts: { id: string; name: string; type: string; balance: number }[];
   }>;
+
+  // Planner methods
+  getAllPlans(userId: string, filters?: { category?: string; status?: string; isTemplate?: boolean }): Promise<Plan[]>;
+  getPlanWithItems(id: string, userId: string): Promise<(Plan & { items: PlanItem[] }) | undefined>;
+  createPlan(plan: InsertPlan & { userId: string }): Promise<Plan>;
+  updatePlan(id: string, userId: string, plan: Partial<InsertPlan>): Promise<Plan | undefined>;
+  deletePlan(id: string, userId: string): Promise<boolean>;
+  createPlanFromTemplate(templateId: string, userId: string, data: { name: string; plannedDate?: string }): Promise<Plan | undefined>;
+  
+  // Plan item methods
+  addPlanItem(item: InsertPlanItem, userId: string): Promise<PlanItem | undefined>;
+  updatePlanItem(itemId: string, planId: string, userId: string, item: Partial<InsertPlanItem>): Promise<PlanItem | undefined>;
+  deletePlanItem(itemId: string, planId: string, userId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -197,7 +210,7 @@ export class MemStorage implements IStorage {
       ...insertBill,
       id,
       status: "pending",
-      lastPaidDate: insertBill.lastPaidDate || null,
+      lastPaidDate: null,
       description: insertBill.description || null,
       createdAt: new Date(),
     } as Bill;
@@ -261,6 +274,197 @@ export class MemStorage implements IStorage {
     const netWorth = totalAssetValue + netBalance;
 
     return { totalIncome, totalExpenses, netBalance, totalAssetValue, netWorth, accounts: [] };
+  }
+
+  async getAllInvoices(userId: string): Promise<any[]> {
+    // Stub implementation - not used in production
+    return [];
+  }
+
+  // Planner methods (in-memory implementation)
+  private planMap = new Map<string, Plan>();
+  private planItemMap = new Map<string, PlanItem>();
+
+  async getAllPlans(userId: string, filters?: { category?: string; status?: string; isTemplate?: boolean }): Promise<Plan[]> {
+    let plans = Array.from(this.planMap.values())
+      .filter((p) => (p as any).userId === userId);
+
+    if (filters?.category) {
+      plans = plans.filter((p) => p.category === filters.category);
+    }
+    if (filters?.status) {
+      plans = plans.filter((p) => p.status === filters.status);
+    }
+    if (filters?.isTemplate !== undefined) {
+      plans = plans.filter((p) => p.isTemplate === filters.isTemplate);
+    }
+
+    return plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getPlanWithItems(id: string, userId: string): Promise<(Plan & { items: PlanItem[] }) | undefined> {
+    const plan = this.planMap.get(id);
+    if (!plan || (plan as any).userId !== userId) return undefined;
+
+    const items = Array.from(this.planItemMap.values())
+      .filter((item) => item.planId === id);
+
+    return { ...plan, items };
+  }
+
+  async createPlan(insertPlan: InsertPlan & { userId: string }): Promise<Plan> {
+    const id = randomUUID();
+    const plan: Plan = {
+      ...insertPlan,
+      id,
+      totalAmount: "0",
+      status: insertPlan.status || "draft",
+      isTemplate: insertPlan.isTemplate || false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Plan;
+    
+    this.planMap.set(id, plan);
+    return plan;
+  }
+
+  async updatePlan(id: string, userId: string, updateData: Partial<InsertPlan>): Promise<Plan | undefined> {
+    const existing = this.planMap.get(id);
+    if (!existing || (existing as any).userId !== userId) return undefined;
+
+    const updated: Plan = { 
+      ...(existing as any), 
+      ...updateData,
+      updatedAt: new Date()
+    } as Plan;
+    
+    this.planMap.set(id, updated);
+    return updated;
+  }
+
+  async deletePlan(id: string, userId: string): Promise<boolean> {
+    const existing = this.planMap.get(id);
+    if (!existing || (existing as any).userId !== userId) return false;
+
+    // Delete associated items
+    const itemsToDelete = Array.from(this.planItemMap.entries())
+      .filter(([_, item]) => item.planId === id)
+      .map(([itemId, _]) => itemId);
+    
+    itemsToDelete.forEach(itemId => this.planItemMap.delete(itemId));
+    
+    return this.planMap.delete(id);
+  }
+
+  async createPlanFromTemplate(templateId: string, userId: string, data: { name: string; plannedDate?: string }): Promise<Plan | undefined> {
+    const template = this.planMap.get(templateId);
+    if (!template || (template as any).userId !== userId || !template.isTemplate) return undefined;
+
+    // Create new plan from template
+    const newPlan = await this.createPlan({
+      name: data.name,
+      description: template.description,
+      category: template.category,
+      plannedDate: data.plannedDate,
+      isTemplate: false,
+      userId,
+    });
+
+    // Copy items from template
+    const templateItems = Array.from(this.planItemMap.values())
+      .filter((item) => item.planId === templateId);
+
+    for (const templateItem of templateItems) {
+      await this.addPlanItem({
+        planId: newPlan.id,
+        name: templateItem.name,
+        quantity: templateItem.quantity,
+        unit: templateItem.unit,
+        rate: templateItem.rate,
+        notes: templateItem.notes,
+      }, userId);
+    }
+
+    return newPlan;
+  }
+
+  async addPlanItem(insertItem: InsertPlanItem, userId: string): Promise<PlanItem | undefined> {
+    // Verify plan exists and belongs to user
+    const plan = this.planMap.get(insertItem.planId);
+    if (!plan || (plan as any).userId !== userId) return undefined;
+
+    const id = randomUUID();
+    const totalAmount = insertItem.quantity * insertItem.rate;
+    
+    const item: PlanItem = {
+      ...insertItem,
+      id,
+      totalAmount: totalAmount.toString(),
+      createdAt: new Date(),
+    } as PlanItem;
+    
+    this.planItemMap.set(id, item);
+
+    // Update plan total
+    await this.updatePlanTotal(insertItem.planId);
+    
+    return item;
+  }
+
+  async updatePlanItem(itemId: string, planId: string, userId: string, updateData: Partial<InsertPlanItem>): Promise<PlanItem | undefined> {
+    const existing = this.planItemMap.get(itemId);
+    if (!existing || existing.planId !== planId) return undefined;
+
+    // Verify plan belongs to user
+    const plan = this.planMap.get(planId);
+    if (!plan || (plan as any).userId !== userId) return undefined;
+
+    const updated: PlanItem = { ...existing, ...updateData } as PlanItem;
+    
+    // Recalculate total amount if quantity or rate changed
+    if (updateData.quantity !== undefined || updateData.rate !== undefined) {
+      const quantity = updateData.quantity ?? existing.quantity;
+      const rate = updateData.rate ?? existing.rate;
+      updated.totalAmount = (quantity * rate).toString();
+    }
+    
+    this.planItemMap.set(itemId, updated);
+
+    // Update plan total
+    await this.updatePlanTotal(planId);
+    
+    return updated;
+  }
+
+  async deletePlanItem(itemId: string, planId: string, userId: string): Promise<boolean> {
+    const existing = this.planItemMap.get(itemId);
+    if (!existing || existing.planId !== planId) return false;
+
+    // Verify plan belongs to user
+    const plan = this.planMap.get(planId);
+    if (!plan || (plan as any).userId !== userId) return false;
+
+    const deleted = this.planItemMap.delete(itemId);
+    
+    if (deleted) {
+      // Update plan total
+      await this.updatePlanTotal(planId);
+    }
+    
+    return deleted;
+  }
+
+  private async updatePlanTotal(planId: string): Promise<void> {
+    const items = Array.from(this.planItemMap.values())
+      .filter((item) => item.planId === planId);
+    
+    const total = items.reduce((sum, item) => sum + parseFloat(item.totalAmount), 0);
+    
+    const plan = this.planMap.get(planId);
+    if (plan) {
+      const updated = { ...plan, totalAmount: total.toString(), updatedAt: new Date() };
+      this.planMap.set(planId, updated);
+    }
   }
 }
 

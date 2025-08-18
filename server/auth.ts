@@ -39,13 +39,28 @@ export interface AuthRequest extends Request {
   };
 }
 
-export function generateToken(userId: string): string {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: "7d" });
+export function generateAccessToken(userId: string): string {
+  return jwt.sign({ userId, type: 'access' }, JWT_SECRET, { expiresIn: "15m" });
 }
 
-export function verifyToken(token: string): { userId: string } | null {
+export function generateRefreshToken(userId: string): string {
+  return jwt.sign({ userId, type: 'refresh' }, JWT_SECRET, { expiresIn: "7d" });
+}
+
+export function generateTokens(userId: string): { accessToken: string; refreshToken: string } {
+  return {
+    accessToken: generateAccessToken(userId),
+    refreshToken: generateRefreshToken(userId)
+  };
+}
+
+export function verifyToken(token: string, expectedType?: 'access' | 'refresh'): { userId: string; type: string } | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as { userId: string };
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; type: string };
+    if (expectedType && decoded.type !== expectedType) {
+      return null;
+    }
+    return decoded;
   } catch {
     return null;
   }
@@ -68,9 +83,9 @@ export async function authenticateToken(
       return res.status(401).json({ message: "Access token required" });
     }
 
-    const decoded = verifyToken(token);
+    const decoded = verifyToken(token, 'access');
     if (!decoded) {
-      return res.status(403).json({ message: "Invalid or expired token" });
+      return res.status(403).json({ message: "Invalid or expired access token" });
     }
 
     const mem = findMemUserById(decoded.userId);
@@ -96,9 +111,9 @@ export async function authenticateToken(
     return res.status(401).json({ message: "Access token required" });
   }
 
-  const decoded = verifyToken(token);
+  const decoded = verifyToken(token, 'access');
   if (!decoded) {
-    return res.status(403).json({ message: "Invalid or expired token" });
+    return res.status(403).json({ message: "Invalid or expired access token" });
   }
 
   try {
@@ -214,13 +229,14 @@ export function setupAuthRoutes(app: any, db: any) {
           });
       }
 
-      // Generate token
-      const token = generateToken(userId);
+      // Generate tokens
+      const tokens = generateTokens(userId);
 
       res.status(201).json({
         message: "User created successfully",
         user: newUser,
-        token,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
       });
     } catch (error) {
       console.error("Registration error:", error);
@@ -258,8 +274,8 @@ export function setupAuthRoutes(app: any, db: any) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
-      // Generate token
-      const token = generateToken(user.id);
+      // Generate tokens
+      const tokens = generateTokens(user.id);
 
       // Return user data (without password)
       const { password: _, ...userWithoutPassword } = user;
@@ -267,7 +283,8 @@ export function setupAuthRoutes(app: any, db: any) {
       res.json({
         message: "Login successful",
         user: userWithoutPassword,
-        token,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
       });
     } catch (error) {
       console.error("Login error:", error);
@@ -278,6 +295,60 @@ export function setupAuthRoutes(app: any, db: any) {
   // Get current user route
   app.get("/api/auth/me", authenticateToken, async (req: AuthRequest, res: Response) => {
     res.json({ user: req.user });
+  });
+
+  // Refresh token route
+  app.post("/api/auth/refresh", async (req: Request, res: Response) => {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(401).json({ message: "Refresh token required" });
+      }
+
+      const decoded = verifyToken(refreshToken, 'refresh');
+      if (!decoded) {
+        return res.status(403).json({ message: "Invalid or expired refresh token" });
+      }
+
+      const storage = app.get("db");
+      const db = storage?.getDb ? storage.getDb() : storage;
+      const isMemMode = !db;
+
+      // Verify user still exists
+      let user: any;
+      if (isMemMode) {
+        user = findMemUserById(decoded.userId);
+      } else {
+        [user] = await db
+          .select({
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            mobile: users.mobile,
+            emailNotifications: users.emailNotifications,
+            smsNotifications: users.smsNotifications,
+          })
+          .from(users)
+          .where(eq(users.id, decoded.userId));
+      }
+
+      if (!user) {
+        return res.status(403).json({ message: "User not found" });
+      }
+
+      // Generate new tokens
+      const tokens = generateTokens(decoded.userId);
+
+      res.json({
+        message: "Tokens refreshed successfully",
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      });
+    } catch (error) {
+      console.error("Token refresh error:", error);
+      res.status(500).json({ message: "Token refresh failed" });
+    }
   });
 
   // Logout route

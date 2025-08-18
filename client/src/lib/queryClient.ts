@@ -5,6 +5,9 @@ import { createLoginUrl } from "@/lib/auth-utils";
 export function handleUnauthorized() {
   try {
     localStorage.removeItem("user");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    // Keep legacy token for backward compatibility
     localStorage.removeItem("token");
     const currentPath = window.location.pathname + window.location.search;
     if (!currentPath.startsWith("/auth")) {
@@ -26,16 +29,67 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-function getToken(): string | null {
+function getAccessToken(): string | null {
   try {
-    return localStorage.getItem("token");
+    return localStorage.getItem("accessToken");
   } catch {
     return null;
   }
 }
 
+function getRefreshToken(): string | null {
+  try {
+    return localStorage.getItem("refreshToken");
+  } catch {
+    return null;
+  }
+}
+
+export async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+
+  try {
+    const response = await fetch("/api/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Token refresh failed");
+    }
+
+    const data = await response.json();
+    localStorage.setItem("accessToken", data.accessToken);
+    localStorage.setItem("refreshToken", data.refreshToken);
+    
+    return data.accessToken;
+  } catch (error) {
+    console.error("Token refresh failed:", error);
+    handleUnauthorized();
+    return null;
+  }
+}
+
 export function buildHeaders(hasBody = false): HeadersInit {
-  const token = getToken();
+  const token = getAccessToken();
+  const headers: Record<string, string> = {};
+
+  if (hasBody) headers["Content-Type"] = "application/json";
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  return headers;
+}
+
+export async function buildHeadersWithRefresh(hasBody = false): Promise<HeadersInit> {
+  let token = getAccessToken();
+  
+  // If no token, try to refresh
+  if (!token) {
+    token = await refreshAccessToken();
+  }
+  
   const headers: Record<string, string> = {};
 
   if (hasBody) headers["Content-Type"] = "application/json";
@@ -61,10 +115,9 @@ export async function apiRequest(
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
+export const getQueryFn = <T>(options: {
   on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
+}): QueryFunction<T> =>
   async ({ queryKey }) => {
     const url = queryKey.join("/") as string;
 
@@ -73,7 +126,7 @@ export const getQueryFn: <T>(options: {
       headers: buildHeaders(false),
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+    if (options.on401 === "returnNull" && res.status === 401) {
       return null as unknown as T;
     }
 

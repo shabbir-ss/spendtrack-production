@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertIncomeSchema, insertExpenseSchema, insertAssetSchema, insertBillSchema, insertAccountSchema } from "@shared/schema";
+import { insertIncomeSchema, insertExpenseSchema, insertAssetSchema, insertBillSchema, insertAccountSchema, insertPlanSchema, insertPlanItemSchema } from "@shared/schema";
 import { z } from "zod";
 import { authenticateToken, type AuthRequest } from "./auth";
 import { upload, deleteUploadedFile, getFileInfo } from "./file-upload";
@@ -434,6 +434,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       res.status(500).json({ message: "Failed to delete file" });
+    }
+  });
+
+  // Planner routes (protected)
+  
+  // Get all plans for a user
+  app.get("/api/plans", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { category, status, isTemplate } = req.query;
+      const plans = await storage.getAllPlans(req.user!.id, {
+        category: category as string,
+        status: status as string,
+        isTemplate: isTemplate === 'true'
+      });
+      res.json(plans);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch plans" });
+    }
+  });
+
+  // Get a specific plan with items
+  app.get("/api/plans/:id", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const plan = await storage.getPlanWithItems(id, req.user!.id);
+      if (!plan) {
+        res.status(404).json({ message: "Plan not found" });
+        return;
+      }
+      res.json(plan);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch plan" });
+    }
+  });
+
+  // Create a new plan
+  app.post("/api/plans", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const data = insertPlanSchema.parse(req.body);
+      const plan = await storage.createPlan({ ...data, userId: req.user!.id });
+      res.status(201).json(plan);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid input data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create plan" });
+      }
+    }
+  });
+
+  // Update a plan
+  app.put("/api/plans/:id", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const data = insertPlanSchema.partial().parse(req.body);
+      const plan = await storage.updatePlan(id, req.user!.id, data);
+      if (!plan) {
+        res.status(404).json({ message: "Plan not found" });
+        return;
+      }
+      res.json(plan);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid input data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to update plan" });
+      }
+    }
+  });
+
+  // Delete a plan
+  app.delete("/api/plans/:id", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deletePlan(id, req.user!.id);
+      if (!deleted) {
+        res.status(404).json({ message: "Plan not found" });
+        return;
+      }
+      res.json({ message: "Plan deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete plan" });
+    }
+  });
+
+  // Create plan from template
+  app.post("/api/plans/:templateId/create-from-template", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { templateId } = req.params;
+      const { name, plannedDate } = req.body;
+      const plan = await storage.createPlanFromTemplate(templateId, req.user!.id, { name, plannedDate });
+      if (!plan) {
+        res.status(404).json({ message: "Template not found" });
+        return;
+      }
+      res.status(201).json(plan);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create plan from template" });
+    }
+  });
+
+  // Plan Items routes
+  
+  // Add item to plan
+  app.post("/api/plans/:planId/items", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { planId } = req.params;
+      
+      // Convert numbers to strings for decimal fields
+      const processedBody = {
+        ...req.body,
+        planId,
+        quantity: req.body.quantity?.toString(),
+        rate: req.body.rate?.toString(),
+      };
+      
+      const data = insertPlanItemSchema.parse(processedBody);
+      const item = await storage.addPlanItem(data, req.user!.id);
+      if (!item) {
+        res.status(404).json({ message: "Plan not found" });
+        return;
+      }
+      res.status(201).json(item);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid input data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to add plan item" });
+      }
+    }
+  });
+
+  // Update plan item
+  app.put("/api/plans/:planId/items/:itemId", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { planId, itemId } = req.params;
+      
+      // Convert numbers to strings for decimal fields
+      const processedBody = {
+        ...req.body,
+        quantity: req.body.quantity?.toString(),
+        rate: req.body.rate?.toString(),
+      };
+      
+      const data = insertPlanItemSchema.partial().parse(processedBody);
+      const item = await storage.updatePlanItem(itemId, planId, req.user!.id, data);
+      if (!item) {
+        res.status(404).json({ message: "Plan item not found" });
+        return;
+      }
+      res.json(item);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid input data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to update plan item" });
+      }
+    }
+  });
+
+  // Delete plan item
+  app.delete("/api/plans/:planId/items/:itemId", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { planId, itemId } = req.params;
+      const deleted = await storage.deletePlanItem(itemId, planId, req.user!.id);
+      if (!deleted) {
+        res.status(404).json({ message: "Plan item not found" });
+        return;
+      }
+      res.json({ message: "Plan item deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete plan item" });
     }
   });
 

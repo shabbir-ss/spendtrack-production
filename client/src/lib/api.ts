@@ -1,4 +1,4 @@
-import { buildHeaders } from "@/lib/queryClient";
+import { buildHeaders, buildHeadersWithRefresh } from "@/lib/queryClient";
 const API_BASE = "/api";
 
 export class ApiError extends Error {
@@ -13,13 +13,14 @@ export class ApiError extends Error {
 export async function apiRequest<T = any>(
   method: string,
   endpoint: string,
-  data?: any
+  data?: any,
+  useRefresh = true
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
   
   const config: RequestInit = {
     method,
-    headers: buildHeaders(!!data),
+    headers: useRefresh ? await buildHeadersWithRefresh(!!data) : buildHeaders(!!data),
   };
 
   if (data && (method === "POST" || method === "PUT" || method === "PATCH")) {
@@ -30,7 +31,18 @@ export async function apiRequest<T = any>(
     const response = await fetch(url, config);
 
     if (response.status === 401) {
-      // Ensure consistent auto-logout behavior
+      // Try to refresh token and retry once
+      if (useRefresh) {
+        const { refreshAccessToken } = await import("@/lib/queryClient");
+        const newToken = await refreshAccessToken();
+        
+        if (newToken) {
+          // Retry with new token
+          return apiRequest(method, endpoint, data, false);
+        }
+      }
+      
+      // If refresh failed or not using refresh, handle unauthorized
       const { handleUnauthorized } = await import("@/lib/queryClient");
       handleUnauthorized();
     }

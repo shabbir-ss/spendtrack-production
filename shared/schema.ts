@@ -94,6 +94,35 @@ export const bills = pgTable("bills", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Plans for quotation/planning purposes
+export const plans = pgTable("plans", {
+  id: varchar("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(), // grocery, shopping, travel, etc.
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  plannedDate: date("planned_date"), // optional: when planning to execute
+  status: text("status").notNull().default("draft"), // draft, active, completed, cancelled
+  isTemplate: boolean("is_template").default(false), // true if this is a reusable template
+  templateName: text("template_name"), // name for template (if isTemplate = true)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Individual items within a plan
+export const planItems = pgTable("plan_items", {
+  id: varchar("id").primaryKey(),
+  planId: varchar("plan_id").notNull().references(() => plans.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  quantity: decimal("quantity", { precision: 8, scale: 2 }).notNull(),
+  unit: text("unit").notNull(), // kg, pieces, liters, etc.
+  rate: decimal("rate", { precision: 10, scale: 2 }).notNull(), // price per unit
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(), // quantity * rate
+  notes: text("notes"), // optional notes for the item
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -131,6 +160,20 @@ export const insertBillSchema = createInsertSchema(bills).omit({
   userId: true,
 });
 
+export const insertPlanSchema = createInsertSchema(plans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  totalAmount: true,
+  userId: true,
+});
+
+export const insertPlanItemSchema = createInsertSchema(planItems).omit({
+  id: true,
+  createdAt: true,
+  totalAmount: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Account = typeof accounts.$inferSelect;
@@ -143,3 +186,7 @@ export type Asset = typeof assets.$inferSelect;
 export type InsertAsset = z.infer<typeof insertAssetSchema>;
 export type Bill = typeof bills.$inferSelect;
 export type InsertBill = z.infer<typeof insertBillSchema>;
+export type Plan = typeof plans.$inferSelect;
+export type InsertPlan = z.infer<typeof insertPlanSchema>;
+export type PlanItem = typeof planItems.$inferSelect;
+export type InsertPlanItem = z.infer<typeof insertPlanItemSchema>;

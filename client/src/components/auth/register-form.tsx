@@ -60,9 +60,12 @@ export default function RegisterForm({ onSuccess, onToggleMode }: RegisterFormPr
 
     try {
       const { confirmPassword, ...registerData } = data;
-      const response = await apiRequest("POST", "/auth/register", registerData);
+      const response = await apiRequest("POST", "/auth/register", registerData, false); // Don't use refresh for register
       localStorage.setItem("user", JSON.stringify(response.user));
-      localStorage.setItem("token", response.token);
+      localStorage.setItem("accessToken", response.accessToken);
+      localStorage.setItem("refreshToken", response.refreshToken);
+      // Keep legacy token for backward compatibility
+      localStorage.setItem("token", response.accessToken);
       onSuccess(response.user);
     } catch (err: any) {
       setError(err.message || "Registration failed. Please try again.");

@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertAssetSchema, type InsertAsset } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { ASSET_CATEGORIES } from "@/lib/constants";
 import {
@@ -55,10 +55,10 @@ export default function AddAssetModal({ children }: AddAssetModalProps) {
   });
 
   const createAssetMutation = useMutation({
-    mutationFn: (data: InsertAsset) => apiRequest("POST", "/api/assets", data),
+    mutationFn: (data: InsertAsset) => apiRequest("POST", "/assets", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["summary"] });
       toast({
         title: "Success",
         description: "Asset added successfully!",
