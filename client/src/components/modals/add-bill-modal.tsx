@@ -65,8 +65,7 @@ export default function AddBillModal({ children }: AddBillModalProps) {
       category: "",
       amount: "",
       dueDate: new Date().toISOString().split("T")[0],
-      recurrence: "monthly",
-      status: "pending",
+      recurringType: "monthly",
     },
   });
 
@@ -209,7 +208,7 @@ export default function AddBillModal({ children }: AddBillModalProps) {
 
             <FormField
               control={form.control}
-              name="recurrence"
+              name="recurringType"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Recurrence</FormLabel>

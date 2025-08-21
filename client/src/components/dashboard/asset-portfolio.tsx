@@ -2,12 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Smartphone, Car, Laptop, Gem, Wrench, Home } from "lucide-react";
+import { Smartphone, Car, Laptop, Briefcase, Wrench, Home, Gem } from "lucide-react";
 import { Asset } from "@shared/schema";
+import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/api";
 
 export default function AssetPortfolio() {
+  const [, setLocation] = useLocation();
   const { data: assets = [], isLoading } = useQuery<Asset[]>({
-    queryKey: ["/api/assets"],
+    queryKey: ["assets"],
+    queryFn: () => apiRequest("GET", "/assets"),
   });
 
   const getAssetIcon = (category: string) => {
@@ -66,7 +70,12 @@ export default function AssetPortfolio() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Asset Portfolio</CardTitle>
-            <Button variant="ghost" size="sm" className="text-purple-500 hover:text-purple-600">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-purple-500 hover:text-purple-600"
+              onClick={() => setLocation('/assets')}
+            >
               Manage Assets
             </Button>
           </div>
@@ -94,6 +103,7 @@ export default function AssetPortfolio() {
             variant="ghost" 
             size="sm" 
             className="text-purple-500 hover:text-purple-600 text-xs sm:text-sm"
+            onClick={() => setLocation('/assets')}
           >
             <span className="hidden sm:inline">Manage Assets</span>
             <span className="sm:hidden">Manage</span>

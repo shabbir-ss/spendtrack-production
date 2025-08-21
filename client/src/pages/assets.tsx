@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Calendar, Gem, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Search, Calendar, Briefcase, TrendingUp, TrendingDown } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/api";
 import AddAssetModal from "@/components/modals/add-asset-modal";
@@ -71,7 +71,7 @@ export default function Assets() {
                   <p className="text-xl lg:text-2xl font-bold text-purple-600">{formatCurrency(totalAssetValue)}</p>
                 </div>
                 <div className="w-10 h-10 lg:w-12 lg:h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                  <Gem className="w-5 h-5 lg:w-6 lg:h-6 text-purple-600" />
+                  <Briefcase className="w-5 h-5 lg:w-6 lg:h-6 text-purple-600" />
                 </div>
               </div>
             </CardContent>

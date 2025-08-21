@@ -14,6 +14,7 @@ import { getCurrentFinancialYear, formatIndianCurrency } from "@/lib/indian-fina
 import { api } from "@/lib/api";
 import { useResponsiveDashboard } from "@/hooks/use-responsive-dashboard";
 import { cn } from "@/lib/utils";
+import { useLocation } from "wouter";
 
 interface SummaryData {
   totalIncome: number;

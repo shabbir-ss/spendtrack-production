@@ -7,7 +7,7 @@ import {
   PieChart, 
   PlusCircle, 
   MinusCircle, 
-  Gem, 
+  Briefcase, 
   BarChart3, 
   Bell, 
   Wallet, 
@@ -21,9 +21,9 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowUpDown,
-  PiggyBank,
   CreditCard,
-  Calculator
+  Calculator,
+  Landmark
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useResponsiveDashboard } from "@/hooks/use-responsive-dashboard";
@@ -31,7 +31,7 @@ import { useResponsiveDashboard } from "@/hooks/use-responsive-dashboard";
 interface NavigationItem {
   name: string;
   href: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: React.ComponentType<any>;
   color: string;
   badge?: {
     label: string;
@@ -72,7 +72,7 @@ const navigation: NavigationItem[] = [
   { 
     name: "Assets", 
     href: "/assets", 
-    icon: PiggyBank, 
+    icon: Briefcase, 
     color: "text-purple-500",
     description: "Manage your investments"
   },
@@ -88,7 +88,6 @@ const navigation: NavigationItem[] = [
     href: "/bills", 
     icon: CreditCard, 
     color: "text-orange-500",
-    badge: { label: "3", variant: "destructive" },
     description: "Upcoming payments"
   },
   { 
@@ -97,6 +96,13 @@ const navigation: NavigationItem[] = [
     icon: Calculator, 
     color: "text-indigo-500",
     description: "Financial planning tools"
+  },
+  { 
+    name: "Savings", 
+    href: "/savings", 
+    icon: Landmark, 
+    color: "text-emerald-500",
+    description: "Long-term savings & investments"
   },
   { 
     name: "Invoice Viewer", 

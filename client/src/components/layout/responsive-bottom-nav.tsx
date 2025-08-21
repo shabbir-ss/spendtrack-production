@@ -12,7 +12,9 @@ import {
   MoreHorizontal,
   PiggyBank,
   BarChart3,
-  Wallet
+  Wallet,
+  ArrowUpDown,
+  Landmark
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -26,7 +28,7 @@ import { useResponsiveDashboard } from "@/hooks/use-responsive-dashboard";
 interface NavigationItem {
   name: string;
   href: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: React.ComponentType<any>;
   shortName: string;
   color: string;
   badge?: {
@@ -75,7 +77,6 @@ const allNavigation: NavigationItem[] = [
     icon: CreditCard, 
     shortName: "Bills",
     color: "text-orange-500",
-    badge: { label: "3", variant: "destructive" },
     priority: 5
   },
   { 
@@ -87,12 +88,20 @@ const allNavigation: NavigationItem[] = [
     priority: 6
   },
   { 
+    name: "Savings", 
+    href: "/savings", 
+    icon: Landmark, 
+    shortName: "Savings",
+    color: "text-emerald-500",
+    priority: 7
+  },
+  { 
     name: "Assets", 
     href: "/assets", 
     icon: PiggyBank, 
     shortName: "Assets",
     color: "text-purple-500",
-    priority: 7
+    priority: 8
   },
   { 
     name: "Reports", 
@@ -100,7 +109,7 @@ const allNavigation: NavigationItem[] = [
     icon: BarChart3, 
     shortName: "Reports",
     color: "text-gray-500",
-    priority: 8
+    priority: 9
   },
   { 
     name: "Accounts", 
@@ -108,7 +117,7 @@ const allNavigation: NavigationItem[] = [
     icon: Wallet, 
     shortName: "Accounts",
     color: "text-amber-500",
-    priority: 8
+    priority: 10
   },
 ];
 

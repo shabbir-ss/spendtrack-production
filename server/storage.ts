@@ -1,4 +1,4 @@
-import { type Income, type InsertIncome, type Expense, type InsertExpense, type Asset, type InsertAsset, type Bill, type InsertBill, type Plan, type InsertPlan, type PlanItem, type InsertPlanItem } from "@shared/schema";
+import { type Income, type InsertIncome, type Expense, type InsertExpense, type Asset, type InsertAsset, type Bill, type InsertBill, type Plan, type InsertPlan, type PlanItem, type InsertPlanItem, type SavingsAccount, type InsertSavingsAccount, type SavingsTransaction, type InsertSavingsTransaction, type Invoice, type InsertInvoice } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { log } from "./vite";
 import { PostgresStorage } from "./pg-storage";
@@ -37,7 +37,9 @@ export interface IStorage {
   transfer(userId: string, fromId: string, toId: string, amount: number): Promise<{ fromBalance: number; toBalance: number }>;
 
   // Invoice methods
-  getAllInvoices(userId: string): Promise<any[]>;
+  getAllInvoices(userId: string): Promise<Invoice[]>;
+  createInvoice(invoice: InsertInvoice & { userId: string }): Promise<Invoice>;
+  deleteInvoice(id: string, userId: string): Promise<boolean>;
 
   // Summary methods
   getSummary(userId: string): Promise<{
@@ -61,6 +63,18 @@ export interface IStorage {
   addPlanItem(item: InsertPlanItem, userId: string): Promise<PlanItem | undefined>;
   updatePlanItem(itemId: string, planId: string, userId: string, item: Partial<InsertPlanItem>): Promise<PlanItem | undefined>;
   deletePlanItem(itemId: string, planId: string, userId: string): Promise<boolean>;
+
+  // Savings account methods
+  getSavingsAccount(id: string, userId: string): Promise<SavingsAccount | undefined>;
+  getAllSavingsAccounts(userId: string): Promise<SavingsAccount[]>;
+  createSavingsAccount(account: InsertSavingsAccount & { userId: string }): Promise<SavingsAccount>;
+  updateSavingsAccount(id: string, userId: string, account: Partial<InsertSavingsAccount>): Promise<SavingsAccount | undefined>;
+  deleteSavingsAccount(id: string, userId: string): Promise<boolean>;
+
+  // Savings transaction methods
+  getSavingsTransactions(accountId: string, userId: string): Promise<SavingsTransaction[]>;
+  createSavingsTransaction(transaction: InsertSavingsTransaction & { userId: string }): Promise<SavingsTransaction>;
+  deleteSavingsTransaction(id: string, userId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -465,6 +479,53 @@ export class MemStorage implements IStorage {
       const updated = { ...plan, totalAmount: total.toString(), updatedAt: new Date() };
       this.planMap.set(planId, updated);
     }
+  }
+
+  // Savings account methods (stub implementations for MemStorage)
+  async getSavingsAccount(id: string, userId: string): Promise<SavingsAccount | undefined> {
+    throw new Error("Savings accounts not implemented in MemStorage");
+  }
+
+  async getAllSavingsAccounts(userId: string): Promise<SavingsAccount[]> {
+    throw new Error("Savings accounts not implemented in MemStorage");
+  }
+
+  async createSavingsAccount(account: InsertSavingsAccount & { userId: string }): Promise<SavingsAccount> {
+    throw new Error("Savings accounts not implemented in MemStorage");
+  }
+
+  async updateSavingsAccount(id: string, userId: string, account: Partial<InsertSavingsAccount>): Promise<SavingsAccount | undefined> {
+    throw new Error("Savings accounts not implemented in MemStorage");
+  }
+
+  async deleteSavingsAccount(id: string, userId: string): Promise<boolean> {
+    throw new Error("Savings accounts not implemented in MemStorage");
+  }
+
+  // Savings transaction methods (stub implementations for MemStorage)
+  async getSavingsTransactions(accountId: string, userId: string): Promise<SavingsTransaction[]> {
+    throw new Error("Savings transactions not implemented in MemStorage");
+  }
+
+  async createSavingsTransaction(transaction: InsertSavingsTransaction & { userId: string }): Promise<SavingsTransaction> {
+    throw new Error("Savings transactions not implemented in MemStorage");
+  }
+
+  async deleteSavingsTransaction(id: string, userId: string): Promise<boolean> {
+    throw new Error("Savings transactions not implemented in MemStorage");
+  }
+
+  // Invoice methods (stub implementations for MemStorage)
+  async getAllInvoices(userId: string): Promise<Invoice[]> {
+    return [];
+  }
+
+  async createInvoice(invoice: InsertInvoice & { userId: string }): Promise<Invoice> {
+    throw new Error("Invoices not implemented in MemStorage");
+  }
+
+  async deleteInvoice(id: string, userId: string): Promise<boolean> {
+    throw new Error("Invoices not implemented in MemStorage");
   }
 }
 

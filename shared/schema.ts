@@ -174,6 +174,85 @@ export const insertPlanItemSchema = createInsertSchema(planItems).omit({
   totalAmount: true,
 });
 
+// Savings accounts for long-term savings schemes
+export const savingsAccounts = pgTable("savings_accounts", {
+  id: varchar("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  schemeType: text("scheme_type").notNull(), // sukanya_samriddhi, ppf, epf, nsc, fd, rd, custom
+  accountNumber: text("account_number"),
+  institution: text("institution"), // bank/post office name
+  interestRate: decimal("interest_rate", { precision: 5, scale: 2 }).notNull(), // annual interest rate
+  maturityDate: date("maturity_date"),
+  maturityAmount: decimal("maturity_amount", { precision: 12, scale: 2 }),
+  currentBalance: decimal("current_balance", { precision: 12, scale: 2 }).notNull().default("0"),
+  targetAmount: decimal("target_amount", { precision: 12, scale: 2 }),
+  minContribution: decimal("min_contribution", { precision: 10, scale: 2 }),
+  maxContribution: decimal("max_contribution", { precision: 10, scale: 2 }),
+  contributionFrequency: text("contribution_frequency").default("monthly"), // monthly, quarterly, yearly, custom
+  lockInPeriod: integer("lock_in_period"), // in years
+  taxBenefit: boolean("tax_benefit").default(false),
+  status: text("status").notNull().default("active"), // active, matured, closed
+  openingDate: date("opening_date").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Standalone invoices table for invoice viewer
+export const invoices = pgTable("invoices", {
+  id: varchar("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  vendor: text("vendor"),
+  amount: decimal("amount", { precision: 10, scale: 2 }),
+  invoiceDate: date("invoice_date"),
+  fileName: text("file_name").notNull(),
+  filePath: text("file_path").notNull(),
+  fileType: text("file_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Savings contributions/transactions
+export const savingsTransactions = pgTable("savings_transactions", {
+  id: varchar("id").primaryKey(),
+  savingsAccountId: varchar("savings_account_id").notNull().references(() => savingsAccounts.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  type: text("type").notNull(), // contribution, withdrawal, interest, maturity
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  description: text("description"),
+  transactionDate: date("transaction_date").notNull(),
+  balanceAfter: decimal("balance_after", { precision: 12, scale: 2 }).notNull(),
+  interestEarned: decimal("interest_earned", { precision: 10, scale: 2 }),
+  referenceNumber: text("reference_number"),
+  invoiceFileName: text("invoice_file_name"), // optional receipt/statement
+  invoiceFilePath: text("invoice_file_path"),
+  invoiceFileType: text("invoice_file_type"),
+  invoiceFileSize: integer("invoice_file_size"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSavingsAccountSchema = createInsertSchema(savingsAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  currentBalance: true,
+  userId: true,
+});
+
+export const insertSavingsTransactionSchema = createInsertSchema(savingsTransactions).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+});
+
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Account = typeof accounts.$inferSelect;
@@ -190,3 +269,9 @@ export type Plan = typeof plans.$inferSelect;
 export type InsertPlan = z.infer<typeof insertPlanSchema>;
 export type PlanItem = typeof planItems.$inferSelect;
 export type InsertPlanItem = z.infer<typeof insertPlanItemSchema>;
+export type SavingsAccount = typeof savingsAccounts.$inferSelect;
+export type InsertSavingsAccount = z.infer<typeof insertSavingsAccountSchema>;
+export type SavingsTransaction = typeof savingsTransactions.$inferSelect;
+export type InsertSavingsTransaction = z.infer<typeof insertSavingsTransactionSchema>;
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;

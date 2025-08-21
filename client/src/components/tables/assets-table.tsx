@@ -23,8 +23,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit, Trash2, Search } from "lucide-react";
+import { Edit, Trash2, Search, Eye } from "lucide-react";
 import { format } from "date-fns";
+import EditAssetModal from "@/components/modals/edit-asset-modal";
 
 export default function AssetsTable() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -72,11 +73,7 @@ export default function AssetsTable() {
   };
 
   const handleEdit = (asset: Asset) => {
-    // TODO: Implement edit functionality
-    toast({
-      title: "Edit Feature",
-      description: "Edit functionality will be available soon!",
-    });
+    // Edit functionality is now handled by the EditAssetModal
   };
 
   const handleDelete = (asset: Asset) => {
@@ -198,13 +195,21 @@ export default function AssetsTable() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleEdit(asset)}
+                        <EditAssetModal
+                          id={asset.id}
+                          initial={{
+                            name: asset.name,
+                            category: asset.category,
+                            purchasePrice: asset.purchasePrice,
+                            currentValue: asset.currentValue,
+                            purchaseDate: asset.purchaseDate,
+                            description: asset.description,
+                          }}
                         >
-                          <Edit size={14} />
-                        </Button>
+                          <Button variant="ghost" size="sm">
+                            <Edit size={14} />
+                          </Button>
+                        </EditAssetModal>
                         <Button
                           variant="ghost"
                           size="sm"

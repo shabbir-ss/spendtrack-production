@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Calendar, ShoppingCart, Package, MapPin, Filter, FileText } from "lucide-react";
+import { Plus, Calendar, ShoppingCart, Package, MapPin, Filter, FileText, Edit, Trash2, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,25 @@ export default function Planner() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Delete plan mutation
+  const deletePlanMutation = useMutation({
+    mutationFn: (planId: string) => apiRequest("DELETE", `/api/plans/${planId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["plans"] });
+      toast({
+        title: "Success",
+        description: "Plan deleted successfully!",
+      });
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete plan. Please try again.",
+      });
+    },
+  });
+
   // Fetch plans
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ["plans", filters],
@@ -66,6 +85,17 @@ export default function Planner() {
   const handlePlanClick = (plan: Plan) => {
     setSelectedPlan(plan);
     setDetailsDialogOpen(true);
+  };
+
+  const handleEditPlan = (plan: Plan) => {
+    setSelectedPlan(plan);
+    setCreateDialogOpen(true);
+  };
+
+  const handleDeletePlan = (plan: Plan) => {
+    if (window.confirm(`Are you sure you want to delete the plan "${plan.name}"?`)) {
+      deletePlanMutation.mutate(plan.id);
+    }
   };
 
   const handleCreateFromTemplate = async (templateId: string, name: string, plannedDate?: string) => {
@@ -101,9 +131,34 @@ export default function Planner() {
               <IconComponent className="h-5 w-5 text-gray-600 dark:text-gray-300" />
               <CardTitle className="text-lg">{plan.name}</CardTitle>
             </div>
-            <Badge className={statusColors[plan.status as keyof typeof statusColors]}>
-              {plan.status}
-            </Badge>
+            <div className="flex items-center space-x-2">
+              <Badge className={statusColors[plan.status as keyof typeof statusColors]}>
+                {plan.status}
+              </Badge>
+              <div className="flex space-x-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditPlan(plan);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeletePlan(plan);
+                  }}
+                  disabled={deletePlanMutation.isPending}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
           {plan.description && (
             <CardDescription className="text-sm">{plan.description}</CardDescription>

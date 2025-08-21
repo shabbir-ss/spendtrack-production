@@ -2,14 +2,17 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { IStorage } from './storage';
 import { 
-  income, expenses, assets, bills, users, accounts, plans, planItems,
+  income, expenses, assets, bills, users, accounts, plans, planItems, savingsAccounts, savingsTransactions, invoices,
   type Income, type InsertIncome, 
   type Expense, type InsertExpense, 
   type Asset, type InsertAsset, 
   type Bill, type InsertBill,
   type User, type Account, type InsertAccount,
   type Plan, type InsertPlan,
-  type PlanItem, type InsertPlanItem
+  type PlanItem, type InsertPlanItem,
+  type SavingsAccount, type InsertSavingsAccount,
+  type SavingsTransaction, type InsertSavingsTransaction,
+  type Invoice, type InsertInvoice
 } from '@shared/schema';
 import { eq, and, desc, sum, sql, isNotNull } from 'drizzle-orm';
 import { log } from './vite';
@@ -703,5 +706,134 @@ export class PostgresStorage implements IStorage {
     } catch (error) {
       log('Error updating plan total amount:', error);
     }
+  }
+
+  // Savings account methods
+  async getSavingsAccount(id: string, userId: string): Promise<SavingsAccount | undefined> {
+    const [row] = await this.db.select().from(savingsAccounts).where(and(eq(savingsAccounts.id, id), eq(savingsAccounts.userId, userId)));
+    return row;
+  }
+
+  async getAllSavingsAccounts(userId: string): Promise<SavingsAccount[]> {
+    return this.db.select().from(savingsAccounts).where(eq(savingsAccounts.userId, userId)).orderBy(desc(savingsAccounts.createdAt));
+  }
+
+  async createSavingsAccount(account: InsertSavingsAccount & { userId: string }): Promise<SavingsAccount> {
+    const id = randomUUID();
+    const [row] = await this.db.insert(savingsAccounts).values({ ...account, id }).returning();
+    return row;
+  }
+
+  async updateSavingsAccount(id: string, userId: string, account: Partial<InsertSavingsAccount>): Promise<SavingsAccount | undefined> {
+    const [row] = await this.db
+      .update(savingsAccounts)
+      .set({ ...account, updatedAt: new Date() })
+      .where(and(eq(savingsAccounts.id, id), eq(savingsAccounts.userId, userId)))
+      .returning();
+    return row;
+  }
+
+  async deleteSavingsAccount(id: string, userId: string): Promise<boolean> {
+    const rows = await this.db.delete(savingsAccounts).where(and(eq(savingsAccounts.id, id), eq(savingsAccounts.userId, userId))).returning();
+    return rows.length > 0;
+  }
+
+  // Savings transaction methods
+  async getSavingsTransactions(accountId: string, userId: string): Promise<SavingsTransaction[]> {
+    // First verify the account belongs to the user
+    const [account] = await this.db.select().from(savingsAccounts).where(and(eq(savingsAccounts.id, accountId), eq(savingsAccounts.userId, userId)));
+    if (!account) return [];
+
+    return this.db.select().from(savingsTransactions)
+      .where(eq(savingsTransactions.savingsAccountId, accountId))
+      .orderBy(desc(savingsTransactions.transactionDate), desc(savingsTransactions.createdAt));
+  }
+
+  async createSavingsTransaction(transaction: InsertSavingsTransaction & { userId: string }): Promise<SavingsTransaction> {
+    const id = randomUUID();
+    
+    // Create the transaction
+    const [newTransaction] = await this.db.insert(savingsTransactions).values({ ...transaction, id }).returning();
+    
+    // Update the savings account balance
+    await this.db
+      .update(savingsAccounts)
+      .set({ 
+        currentBalance: transaction.balanceAfter,
+        updatedAt: new Date()
+      })
+      .where(eq(savingsAccounts.id, transaction.savingsAccountId));
+
+    return newTransaction;
+  }
+
+  async deleteSavingsTransaction(id: string, userId: string): Promise<boolean> {
+    // Get the transaction to verify ownership and get account info
+    const [transaction] = await this.db
+      .select({
+        id: savingsTransactions.id,
+        savingsAccountId: savingsTransactions.savingsAccountId,
+        type: savingsTransactions.type,
+        amount: savingsTransactions.amount,
+        userId: savingsAccounts.userId
+      })
+      .from(savingsTransactions)
+      .innerJoin(savingsAccounts, eq(savingsTransactions.savingsAccountId, savingsAccounts.id))
+      .where(and(eq(savingsTransactions.id, id), eq(savingsAccounts.userId, userId)));
+
+    if (!transaction) return false;
+
+    // Delete the transaction
+    const rows = await this.db.delete(savingsTransactions).where(eq(savingsTransactions.id, id)).returning();
+    
+    if (rows.length > 0) {
+      // Recalculate account balance by summing all remaining transactions
+      const [balanceResult] = await this.db
+        .select({
+          balance: sql<string>`
+            COALESCE(
+              SUM(
+                CASE 
+                  WHEN ${savingsTransactions.type} IN ('contribution', 'interest') THEN ${savingsTransactions.amount}::numeric
+                  ELSE -${savingsTransactions.amount}::numeric
+                END
+              ), 
+              0
+            )
+          `
+        })
+        .from(savingsTransactions)
+        .where(eq(savingsTransactions.savingsAccountId, transaction.savingsAccountId));
+
+      const newBalance = balanceResult?.balance || '0';
+
+      // Update the account balance
+      await this.db
+        .update(savingsAccounts)
+        .set({ 
+          currentBalance: newBalance,
+          updatedAt: new Date()
+        })
+        .where(eq(savingsAccounts.id, transaction.savingsAccountId));
+    }
+
+    return rows.length > 0;
+  }
+
+  // Invoice methods
+  async getAllInvoices(userId: string): Promise<Invoice[]> {
+    const rows = await this.db.select().from(invoices).where(eq(invoices.userId, userId));
+    return rows;
+  }
+
+  async createInvoice(invoice: InsertInvoice & { userId: string }): Promise<Invoice> {
+    const id = randomUUID();
+    const [row] = await this.db.insert(invoices).values({ ...invoice, id }).returning();
+    return row;
+  }
+
+  async deleteInvoice(id: string, userId: string): Promise<boolean> {
+    const rows = await this.db.delete(invoices).where(and(eq(invoices.id, id), eq(invoices.userId, userId))).returning();
+    return rows.length > 0;
   }
 }

@@ -288,7 +288,6 @@ export default function EnhancedTransactionsTable({
       align: "right",
       render: (value, row) => (
         <div className="flex items-center justify-end gap-2">
-          <DollarSign className="h-4 w-4 text-gray-400" />
           <span
             className={cn(
               "font-bold text-lg",

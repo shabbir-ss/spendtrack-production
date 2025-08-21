@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertIncomeSchema, insertExpenseSchema, insertAssetSchema, insertBillSchema, insertAccountSchema, insertPlanSchema, insertPlanItemSchema } from "@shared/schema";
+import { insertIncomeSchema, insertExpenseSchema, insertAssetSchema, insertBillSchema, insertAccountSchema, insertPlanSchema, insertPlanItemSchema, insertSavingsAccountSchema, insertSavingsTransactionSchema, insertInvoiceSchema } from "@shared/schema";
 import { z } from "zod";
 import { authenticateToken, type AuthRequest } from "./auth";
 import { upload, deleteUploadedFile, getFileInfo } from "./file-upload";
@@ -80,6 +80,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const data = insertExpenseSchema.parse(req.body);
       const expense = await storage.createExpense({ ...data, userId: req.user!.id });
+      
+      // If expense is paid from an account, deduct the amount
+      if (data.accountId) {
+        const db = req.app.get('db');
+        if (db && 'updateAccountBalance' in db) {
+          await (db as any).updateAccountBalance(req.user!.id, data.accountId, -parseFloat(data.amount));
+        }
+      }
+      
       res.status(201).json(expense);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -606,6 +615,167 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Plan item deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete plan item" });
+    }
+  });
+
+  // Savings accounts routes
+  app.get("/api/savings-accounts", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const accounts = await storage.getAllSavingsAccounts(req.user!.id);
+      res.json(accounts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch savings accounts" });
+    }
+  });
+
+  app.post("/api/savings-accounts", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const data = insertSavingsAccountSchema.parse(req.body);
+      const account = await storage.createSavingsAccount({ ...data, userId: req.user!.id });
+      res.status(201).json(account);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid input data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create savings account" });
+      }
+    }
+  });
+
+  app.put("/api/savings-accounts/:id", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const data = insertSavingsAccountSchema.partial().parse(req.body);
+      const account = await storage.updateSavingsAccount(id, req.user!.id, data);
+      if (!account) {
+        res.status(404).json({ message: "Savings account not found" });
+        return;
+      }
+      res.json(account);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid input data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to update savings account" });
+      }
+    }
+  });
+
+  app.delete("/api/savings-accounts/:id", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteSavingsAccount(id, req.user!.id);
+      if (!deleted) {
+        res.status(404).json({ message: "Savings account not found" });
+        return;
+      }
+      res.json({ message: "Savings account deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete savings account" });
+    }
+  });
+
+  // Savings transactions routes
+  app.get("/api/savings-transactions/:accountId", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { accountId } = req.params;
+      const transactions = await storage.getSavingsTransactions(accountId, req.user!.id);
+      res.json(transactions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch savings transactions" });
+    }
+  });
+
+  app.post("/api/savings-transactions", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const data = insertSavingsTransactionSchema.parse(req.body);
+      const transaction = await storage.createSavingsTransaction({ ...data, userId: req.user!.id });
+      res.status(201).json(transaction);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid input data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create savings transaction" });
+      }
+    }
+  });
+
+  app.delete("/api/savings-transactions/:id", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteSavingsTransaction(id, req.user!.id);
+      if (!deleted) {
+        res.status(404).json({ message: "Savings transaction not found" });
+        return;
+      }
+      res.json({ message: "Savings transaction deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete savings transaction" });
+    }
+  });
+
+  // Invoice routes (protected)
+  app.get("/api/invoices", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const invoices = await storage.getAllInvoices(req.user!.id);
+      res.json(invoices);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  app.post("/api/invoices", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const data = insertInvoiceSchema.parse(req.body);
+      const invoice = await storage.createInvoice({ ...data, userId: req.user!.id });
+      res.status(201).json(invoice);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid input data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create invoice" });
+      }
+    }
+  });
+
+  app.delete("/api/invoices/:id", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteInvoice(id, req.user!.id);
+      if (!success) {
+        res.status(404).json({ message: "Invoice not found" });
+        return;
+      }
+      res.json({ message: "Invoice deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete invoice" });
+    }
+  });
+
+  // Summary endpoint for dashboard
+  app.get("/api/summary", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const [income, expenses, assets] = await Promise.all([
+        storage.getAllIncome(req.user!.id),
+        storage.getAllExpenses(req.user!.id),
+        storage.getAllAssets(req.user!.id)
+      ]);
+
+      const totalIncome = income.reduce((sum, item) => sum + parseFloat(item.amount), 0);
+      const totalExpenses = expenses.reduce((sum, item) => sum + parseFloat(item.amount), 0);
+      const totalAssetValue = assets.reduce((sum, item) => sum + parseFloat(item.currentValue), 0);
+      const netBalance = totalIncome - totalExpenses;
+      const netWorth = netBalance + totalAssetValue;
+
+      res.json({
+        totalIncome,
+        totalExpenses,
+        netBalance,
+        totalAssetValue,
+        netWorth
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch summary data" });
     }
   });
 

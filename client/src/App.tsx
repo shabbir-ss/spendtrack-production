@@ -26,6 +26,7 @@ import Bills from "./pages/bills";
 import Planner from "./pages/planner";
 import Invoices from "./pages/invoices";
 import Reports from "./pages/reports";
+import Savings from "./pages/savings";
 import AuthPage from "./pages/auth";
 import NotFound from "./pages/not-found";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,6 +43,7 @@ function Router() {
       <Route path="/accounts" component={Accounts} />
       <Route path="/bills" component={Bills} />
       <Route path="/planner" component={Planner} />
+      <Route path="/savings" component={Savings} />
       <Route path="/invoices" component={Invoices} />
       <Route path="/reports" component={Reports} />
       <Route path="/auth" component={AuthPage} />
