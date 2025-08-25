@@ -1,7 +1,39 @@
+# Dependencies
 node_modules
-dist
+
+# Development files (moved to DUMPED)
+DUMPED/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build artifacts (keep dist/ for production)
+# dist/ - COMMENTED OUT - we need dist/ in production
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+*.tmp
+*.temp
 server/public
 vite.config.ts.*
 *.tar.gz
-.env
+
+# Production organization script (optional)
+organize-for-production.ps1
