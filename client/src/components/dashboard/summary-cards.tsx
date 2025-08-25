@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Scale, Gem } from "lucide-react";
+import { TrendingUp, TrendingDown, Scale, Diamond } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatIndianCurrency } from "@/lib/indian-financial-year";
 import { cn } from "@/lib/utils";
@@ -52,7 +52,7 @@ export default function SummaryCards({
       title: "Asset Portfolio",
       value: formatIndianCurrency(totalAssetValue),
       subtitle: "Current asset value",
-      icon: Gem,
+      icon: Diamond,
       iconColor: "text-purple-500",
       bgColor: "bg-purple-100 dark:bg-purple-900/50",
       valueColor: "asset-color",

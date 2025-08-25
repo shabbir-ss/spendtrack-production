@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Calendar, Briefcase, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Search, Calendar, Briefcase, TrendingUp, TrendingDown, Diamond } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/api";
 import AddAssetModal from "@/components/modals/add-asset-modal";
@@ -175,7 +175,7 @@ export default function Assets() {
                 </div>
               ) : filteredAssets.length === 0 ? (
                 <div className="p-6 text-center">
-                  <Gem size={48} className="mx-auto text-gray-400 mb-4" />
+                  <Diamond size={48} className="mx-auto text-gray-400 mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                     No assets found
                   </h3>

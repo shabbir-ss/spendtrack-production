@@ -1,12 +1,12 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { PieChart, PlusCircle, MinusCircle, Gem, BarChart3, Bell } from "lucide-react";
+import { PieChart, PlusCircle, MinusCircle, Diamond, BarChart3, Bell } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: PieChart, color: "text-blue-500" },
   { name: "Income", href: "/income", icon: PlusCircle, color: "text-green-500" },
   { name: "Expenses", href: "/expenses", icon: MinusCircle, color: "text-red-500" },
-  { name: "Assets", href: "/assets", icon: Gem, color: "text-purple-500" },
+  { name: "Assets", href: "/assets", icon: Diamond, color: "text-purple-500" },
   { name: "Bills", href: "/bills", icon: Bell, color: "text-orange-500" },
   { name: "Reports", href: "/reports", icon: BarChart3, color: "text-gray-500" },
 ];

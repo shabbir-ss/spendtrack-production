@@ -7,6 +7,7 @@ import { authenticateToken, type AuthRequest } from "./auth";
 import { upload, deleteUploadedFile, getFileInfo } from "./file-upload";
 import path from "path";
 import fs from "fs";
+import jwt from "jsonwebtoken";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Income routes (protected)
@@ -394,6 +395,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // TODO: Add authorization check to ensure user owns this transaction
       
       res.sendFile(filePath);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to serve file" });
+    }
+  });
+
+  // View invoice file (protected) - supports both header and query token
+  app.get("/api/files/:transactionId/:filename", async (req: AuthRequest, res) => {
+    try {
+      // Check for token in query parameter or header
+      const token = req.query.token as string || req.headers.authorization?.replace('Bearer ', '');
+      
+      if (!token) {
+        return res.status(401).json({ message: "No token provided" });
+      }
+
+      // Verify token
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+        req.user = decoded;
+      } catch (error) {
+        return res.status(401).json({ message: "Invalid token" });
+      }
+
+      const { transactionId, filename } = req.params;
+      const filePath = path.join(process.cwd(), 'uploads', transactionId, filename);
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      // TODO: Add authorization check to ensure user owns this transaction
+      
+      res.sendFile(path.resolve(filePath));
     } catch (error) {
       res.status(500).json({ message: "Failed to serve file" });
     }

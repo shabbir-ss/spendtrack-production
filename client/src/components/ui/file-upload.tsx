@@ -64,7 +64,7 @@ export function FileUpload({
       const response = await fetch('/api/upload/invoice', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
         },
         body: formData,
       });

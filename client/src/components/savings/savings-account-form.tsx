@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/api";
 import { SAVINGS_SCHEMES } from "@/pages/savings";
 import type { InsertSavingsAccount, SavingsAccount } from "@shared/schema";
 
@@ -76,7 +77,7 @@ export default function SavingsAccountForm({ account, onSuccess }: SavingsAccoun
 
   const mutation = useMutation({
     mutationFn: async (data: SavingsAccountFormData) => {
-      const url = account ? `/api/savings-accounts/${account.id}` : "/api/savings-accounts";
+      const url = account ? `/savings-accounts/${account.id}` : "/savings-accounts";
       const method = account ? "PUT" : "POST";
       
       const payload: Partial<InsertSavingsAccount> = {
@@ -97,17 +98,7 @@ export default function SavingsAccountForm({ account, onSuccess }: SavingsAccoun
         notes: data.notes || null,
       };
 
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save savings account");
-      }
-
-      return response.json();
+      return await apiRequest(method, url, payload);
     },
     onSuccess: () => {
       toast({

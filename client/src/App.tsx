@@ -8,9 +8,11 @@ import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { createLoginUrl } from "@/lib/auth-utils";
 import Header from "@/components/layout/header";
 import ResponsiveHeader from "@/components/layout/responsive-header";
+import EnhancedMobileHeader from "@/components/layout/enhanced-mobile-header";
 import ResponsiveStatusBar from "@/components/layout/responsive-status-bar";
 import ResponsiveSidebar from "@/components/layout/responsive-sidebar";
 import ResponsiveBottomNav from "@/components/layout/responsive-bottom-nav";
+import EnhancedBottomNav from "@/components/layout/enhanced-bottom-nav";
 import Sidebar from "@/components/layout/sidebar";
 import MobileNav from "@/components/layout/mobile-nav";
 import MobileHeader from "@/components/layout/mobile-header";
@@ -30,6 +32,8 @@ import Savings from "./pages/savings";
 import AuthPage from "./pages/auth";
 import NotFound from "./pages/not-found";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEnhancedMobile } from "@/hooks/use-enhanced-mobile";
+import { cn } from "@/lib/utils";
 
 function Router() {
   return (
@@ -54,29 +58,46 @@ function Router() {
 
 function AuthenticatedApp() {
   const { theme, toggleTheme } = useTheme();
+  const { isMobile, config } = useEnhancedMobile();
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
-      {/* Responsive Header */}
-      <ResponsiveHeader theme={theme} toggleTheme={toggleTheme} />
+      {/* Enhanced Mobile Header for mobile, Responsive Header for desktop */}
+      {isMobile ? (
+        <EnhancedMobileHeader 
+          theme={theme} 
+          toggleTheme={toggleTheme}
+          searchable={true}
+        />
+      ) : (
+        <ResponsiveHeader theme={theme} toggleTheme={toggleTheme} />
+      )}
       
       <div className="flex flex-1 min-h-0">
-        <ResponsiveSidebar />
-        <main className="flex-1 flex flex-col min-h-0 p-4 lg:p-6 pb-20 lg:pb-6">
+        {!isMobile && <ResponsiveSidebar />}
+        <main className={cn(
+          "flex-1 flex flex-col min-h-0",
+          config.containerPadding,
+          isMobile ? "pb-20" : "pb-6"
+        )}>
           <div className="flex-1 min-h-0">
             <Router />
           </div>
         </main>
       </div>
       
-      {/* Responsive Bottom Navigation for Mobile */}
-      <ResponsiveBottomNav />
+      {/* Enhanced Bottom Navigation for Mobile */}
+      {isMobile ? (
+        <EnhancedBottomNav 
+          showLabels={!config.isVerySmall}
+          showFAB={true}
+        />
+      ) : (
+        <ResponsiveBottomNav />
+      )}
       
       {/* Responsive Status Bar */}
       <ResponsiveStatusBar showDebugInfo={process.env.NODE_ENV === 'development'} />
-      
-      {/* Floating Action Button */}
-      {/* <FloatingActionButton /> */}
     </div>
   );
 }

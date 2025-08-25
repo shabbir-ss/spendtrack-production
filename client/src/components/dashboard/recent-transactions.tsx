@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, TrendingDown, Gem } from "lucide-react";
+import { TrendingUp, TrendingDown, Diamond } from "lucide-react";
 import { Income, Expense, Asset } from "@shared/schema";
 import { format } from "date-fns";
 import { Link } from "wouter";
@@ -74,7 +74,7 @@ export default function RecentTransactions() {
       case "expense":
         return <TrendingDown className="text-red-500" size={16} />;
       case "asset":
-        return <Gem className="text-purple-500" size={16} />;
+        return <Diamond className="text-purple-500" size={16} />;
       default:
         return null;
     }

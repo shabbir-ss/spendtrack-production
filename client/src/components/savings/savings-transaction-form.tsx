@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/api";
 import type { InsertSavingsTransaction, SavingsAccount } from "@shared/schema";
 
 const savingsTransactionSchema = z.object({
@@ -65,17 +66,7 @@ export default function SavingsTransactionForm({ savingsAccount, onSuccess }: Sa
         interestEarned: data.type === "interest" ? data.amount : null,
       };
 
-      const response = await fetch("/api/savings-transactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create savings transaction");
-      }
-
-      return response.json();
+      return await apiRequest("POST", "/savings-transactions", payload);
     },
     onSuccess: () => {
       toast({

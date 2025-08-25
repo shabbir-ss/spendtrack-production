@@ -103,12 +103,27 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  // First attempt
+  let res = await fetch(url, {
     method,
-    headers: buildHeaders(!!data),
+    headers: await buildHeadersWithRefresh(!!data),
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
+
+  // If we get 401, try to refresh token and retry once
+  if (res.status === 401) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      // Retry with new token
+      res = await fetch(url, {
+        method,
+        headers: await buildHeadersWithRefresh(!!data),
+        body: data ? JSON.stringify(data) : undefined,
+        credentials: "include",
+      });
+    }
+  }
 
   await throwIfResNotOk(res);
   return res;
@@ -121,10 +136,23 @@ export const getQueryFn = <T>(options: {
   async ({ queryKey }) => {
     const url = queryKey.join("/") as string;
 
-    const res = await fetch(url, {
+    // First attempt
+    let res = await fetch(url, {
       credentials: "include",
-      headers: buildHeaders(false),
+      headers: await buildHeadersWithRefresh(false),
     });
+
+    // If we get 401, try to refresh token and retry once
+    if (res.status === 401) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        // Retry with new token
+        res = await fetch(url, {
+          credentials: "include",
+          headers: await buildHeadersWithRefresh(false),
+        });
+      }
+    }
 
     if (options.on401 === "returnNull" && res.status === 401) {
       return null as unknown as T;

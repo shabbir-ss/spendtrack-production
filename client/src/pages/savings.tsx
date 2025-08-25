@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { apiRequest } from "@/lib/api";
 import SavingsAccountForm from "@/components/savings/savings-account-form";
 import SavingsTransactionForm from "@/components/savings/savings-transaction-form";
 import SavingsAccountDetails from "@/components/savings/savings-account-details";
@@ -117,12 +118,7 @@ export default function Savings() {
   // Delete savings account mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/savings-accounts/${id}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) {
-        throw new Error("Failed to delete savings account");
-      }
+      await apiRequest("DELETE", `/savings-accounts/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/savings-accounts"] });

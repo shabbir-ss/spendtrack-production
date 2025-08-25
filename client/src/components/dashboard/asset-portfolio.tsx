@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Smartphone, Car, Laptop, Briefcase, Wrench, Home, Gem } from "lucide-react";
+import { Smartphone, Car, Laptop, Briefcase, Wrench, Home, Diamond } from "lucide-react";
 import { Asset } from "@shared/schema";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/api";
@@ -25,7 +25,7 @@ export default function AssetPortfolio() {
       case "tools":
         return <Wrench className="text-purple-500" size={20} />;
       default:
-        return <Gem className="text-purple-500" size={20} />;
+        return <Diamond className="text-purple-500" size={20} />;
     }
   };
 

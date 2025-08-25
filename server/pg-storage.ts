@@ -54,6 +54,16 @@ export class PostgresStorage implements IStorage {
     return rows.length > 0;
   }
 
+  async updateAccountBalance(userId: string, accountId: string, amount: number): Promise<void> {
+    const [account] = await this.db.select().from(accounts).where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)));
+    if (!account) throw new Error('Account not found');
+
+    const currentBalance = parseFloat(account.balance as unknown as string);
+    const newBalance = currentBalance + amount;
+    
+    await this.db.update(accounts).set({ balance: newBalance.toFixed(2) as any }).where(eq(accounts.id, accountId));
+  }
+
   // Income methods
   async getIncome(id: string, userId: string): Promise<Income | undefined> {
     const results = await this.db.select().from(income).where(and(eq(income.id, id), eq(income.userId, userId)));

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Plus, PlusCircle, MinusCircle, Gem, Bell, X, FileText, ArrowLeftRight } from "lucide-react";
+import { Plus, PlusCircle, MinusCircle, Diamond, Bell, X, FileText, ArrowLeftRight } from "lucide-react";
 import AddIncomeModal from "@/components/modals/add-income-modal";
 import AddExpenseModal from "@/components/modals/add-expense-modal";
 import AddAssetModal from "@/components/modals/add-asset-modal";
@@ -24,7 +24,7 @@ const quickActions = [
   },
   {
     name: "Add Asset",
-    icon: Gem,
+    icon: Diamond,
     color: "bg-purple-500 hover:bg-purple-600", 
     component: AddAssetModal,
   },

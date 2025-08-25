@@ -294,7 +294,7 @@ export default function ResponsiveSidebar({ className }: ResponsiveSidebarProps)
   // Desktop Sidebar
   return (
     <aside className={cn(
-      "bg-white dark:bg-gray-800 shadow-sm border-r border-gray-200 dark:border-gray-700 hidden lg:flex flex-col transition-all duration-300",
+      "bg-white dark:bg-gray-800 shadow-sm border-r border-gray-200 dark:border-gray-700 hidden lg:flex h-full flex-shrink-0 flex-col transition-all duration-300",
       isCollapsed ? "w-16" : "w-64",
       className
     )}>

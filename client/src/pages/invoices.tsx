@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,27 +17,100 @@ import {
   X
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { apiRequest } from "@/lib/api";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-
-interface Invoice {
-  id: string;
-  name: string;
-  file: File;
-  uploadDate: Date;
-  size: number;
-  type: string;
-  amount?: number;
-  vendor?: string;
-}
+import { Invoice } from "@shared/schema";
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterType, setFilterType] = useState("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch invoices from API
+  const { data: invoices = [], isLoading, error } = useQuery({
+    queryKey: ['invoices'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/invoices');
+      return response as Invoice[];
+    }
+  });
+
+  // Upload invoice mutation
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('invoice', file);
+      formData.append('transactionId', 'standalone');
+
+      const uploadResponse = await fetch('/api/upload/invoice', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const uploadResult = await uploadResponse.json();
+      
+      // Create invoice record
+      const invoiceData = {
+        name: uploadResult.file.originalName,
+        fileName: uploadResult.file.originalName,
+        filePath: uploadResult.file.path,
+        fileType: uploadResult.file.mimetype,
+        fileSize: uploadResult.file.size,
+      };
+
+      return await apiRequest('POST', '/invoices', invoiceData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast({
+        title: "Success",
+        description: "Invoice uploaded successfully!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description: error.message || "Failed to upload invoice. Please try again.",
+      });
+    }
+  });
+
+  // Delete invoice mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      await apiRequest('DELETE', `/invoices/${invoiceId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      setSelectedInvoice(null);
+      setPreviewUrl(null);
+      toast({
+        title: "Success",
+        description: "Invoice deleted successfully!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Delete failed",
+        description: error.message || "Failed to delete invoice. Please try again.",
+      });
+    }
+  });
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -44,83 +118,56 @@ export default function InvoicesPage() {
 
     Array.from(files).forEach((file) => {
       // Check file type
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
       if (!allowedTypes.includes(file.type)) {
         toast({
           variant: "destructive",
           title: "Invalid file type",
-          description: "Please upload images (JPEG, PNG, GIF) or PDF files only.",
+          description: "Please upload images (JPEG, PNG, WEBP) or PDF files only.",
         });
         return;
       }
 
-      // Check file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
+      // Check file size (50MB limit to match backend)
+      if (file.size > 50 * 1024 * 1024) {
         toast({
           variant: "destructive",
           title: "File too large",
-          description: "Please upload files smaller than 10MB.",
+          description: "Please upload files smaller than 50MB.",
         });
         return;
       }
 
-      const newInvoice: Invoice = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        name: file.name,
-        file,
-        uploadDate: new Date(),
-        size: file.size,
-        type: file.type,
-      };
-
-      setInvoices(prev => [...prev, newInvoice]);
+      uploadMutation.mutate(file);
     });
 
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-
-    toast({
-      title: "Files uploaded",
-      description: `${files.length} file(s) uploaded successfully.`,
-    });
   };
 
   const handleViewInvoice = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
-    const url = URL.createObjectURL(invoice.file);
-    setPreviewUrl(url);
+    // For server-stored files, construct the URL to view the file
+    const filename = invoice.filePath?.split('/').pop();
+    const viewUrl = `/api/files/standalone/${filename}?token=${localStorage.getItem('accessToken')}`;
+    setPreviewUrl(viewUrl);
   };
 
   const handleClosePreview = () => {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
     setSelectedInvoice(null);
     setPreviewUrl(null);
   };
 
   const handleDeleteInvoice = (invoiceId: string) => {
-    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
-    if (selectedInvoice?.id === invoiceId) {
-      handleClosePreview();
-    }
-    toast({
-      title: "Invoice deleted",
-      description: "Invoice has been removed successfully.",
-    });
+    deleteMutation.mutate(invoiceId);
   };
 
   const handleDownloadOriginal = (invoice: Invoice) => {
-    const url = URL.createObjectURL(invoice.file);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = invoice.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const filename = invoice.filePath?.split('/').pop();
+    const downloadUrl = `/api/download/standalone/${filename}`;
+    window.open(downloadUrl, '_blank');
   };
 
   const handleDownloadAsPDF = async (invoice: Invoice) => {
@@ -228,10 +275,11 @@ export default function InvoicesPage() {
           </div>
           <Button 
             onClick={() => fileInputRef.current?.click()}
+            disabled={uploadMutation.isPending}
             className="bg-teal-600 hover:bg-teal-700 text-white"
           >
             <Upload size={16} className="mr-2" />
-            Upload Invoice
+            {uploadMutation.isPending ? 'Uploading...' : 'Upload Invoice'}
           </Button>
         </div>
 
@@ -244,7 +292,7 @@ export default function InvoicesPage() {
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Invoices</p>
                   <p className="text-2xl lg:text-3xl font-bold text-teal-600">{invoices.length}</p>
                   <p className="text-xs lg:text-sm text-gray-500 dark:text-gray-400">
-                    {formatFileSize(invoices.reduce((sum, inv) => sum + inv.size, 0))} total size
+                    {formatFileSize(invoices.reduce((sum, inv) => sum + (inv.fileSize || 0), 0))} total size
                   </p>
                 </div>
                 <div className="w-12 h-12 lg:w-16 lg:h-16 bg-teal-100 dark:bg-teal-900 rounded-lg flex items-center justify-center">
@@ -276,7 +324,24 @@ export default function InvoicesPage() {
             </CardHeader>
             <CardContent className="flex-1 min-h-0 p-0">
               <div className="h-full overflow-auto">
-                {invoices.length === 0 ? (
+                {isLoading ? (
+                  <div className="p-6 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Loading invoices...</p>
+                  </div>
+                ) : error ? (
+                  <div className="p-6 text-center">
+                    <div className="text-red-500 mb-4">⚠️</div>
+                    <p className="text-gray-600 dark:text-gray-400">Failed to load invoices</p>
+                    <Button 
+                      onClick={() => queryClient.invalidateQueries({ queryKey: ['invoices'] })}
+                      variant="outline"
+                      className="mt-2"
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                ) : invoices.length === 0 ? (
                   <div className="p-6 text-center">
                     <FileText size={48} className="mx-auto text-gray-400 mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
@@ -296,7 +361,7 @@ export default function InvoicesPage() {
                 ) : (
                   <div className="p-4 space-y-3">
                     {invoices.map((invoice) => {
-                      const FileIcon = getFileIcon(invoice.type);
+                      const FileIcon = getFileIcon(invoice.fileType || 'application/pdf');
                       const isSelected = selectedInvoice?.id === invoice.id;
                       
                       return (
@@ -320,14 +385,14 @@ export default function InvoicesPage() {
                                 </h4>
                                 <div className="flex items-center space-x-2 mt-1">
                                   <Badge variant="secondary" className="text-xs">
-                                    {invoice.type.split('/')[1].toUpperCase()}
+                                    {(invoice.fileType || 'pdf').split('/')[1]?.toUpperCase() || 'PDF'}
                                   </Badge>
                                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {formatFileSize(invoice.size)}
+                                    {formatFileSize(invoice.fileSize || 0)}
                                   </span>
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  {invoice.uploadDate.toLocaleDateString()}
+                                  {new Date(invoice.createdAt).toLocaleDateString()}
                                 </p>
                               </div>
                             </div>
